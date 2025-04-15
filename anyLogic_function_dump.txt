@@ -1,0 +1,552 @@
+// In the Main Agent
+Function bdoy for initializeSupplyChain(): 
+
+initializeCustomerDemand();
+
+    // Create supply chain members if not already created
+    if (supplyChain.isEmpty()) {
+        // Create retailer
+        SupplyChainMember retailer = new SupplyChainMember();
+        retailer.memberType = "Retailer";
+        retailer.initialInventory = 12;
+        supplyChain.add(retailer);
+        
+        // Create wholesaler
+        SupplyChainMember wholesaler = new SupplyChainMember();
+        wholesaler.memberType = "Wholesaler";
+        wholesaler.initialInventory = 12;
+        supplyChain.add(wholesaler);
+        
+        // Create distributor
+        SupplyChainMember distributor = new SupplyChainMember();
+        distributor.memberType = "Distributor";
+        distributor.initialInventory = 12;
+        supplyChain.add(distributor);
+        
+        // Create factory
+        SupplyChainMember factory = new SupplyChainMember();
+        factory.memberType = "Factory";
+        factory.initialInventory = 12;
+        supplyChain.add(factory);
+    }
+    
+    // Initialize all members
+for (SupplyChainMember member : supplyChain) {
+        member.currentInventory = member.initialInventory;
+        member.backorderedAmount = 0;
+        member.incomingOrder = 0;
+        member.outgoingOrder = 0;
+        member.incomingShipment = 0;
+        member.outgoingShipment = 0;
+        member.totalCost = 0;
+        
+        // Set cost parameters
+        member.holdingCost = 1.0;
+        member.backorderCost = 2.0;
+        
+        // Set delay periods
+        member.shippingDelayPeriod = shippingDelayPeriod;
+        member.orderDelayPeriod = orderDelayPeriod;  
+        
+        // Initialize the arrays
+    	member.orderPipeline = new int[5];  // Create array with 5 elements
+    	member.shipmentPipeline = new int[5];
+    	member.productionPipeline = new int[5];             
+        
+        // Initialize pipeline arrays with zeros
+        for (int i = 0; i < orderDelayPeriod; i++) {
+            member.orderPipeline[i] = 4;          
+        }
+        for (int i = 0; i < shippingDelayPeriod; i++) {
+            member.shipmentPipeline[i] = 4;          
+        }
+        for (int i = 0; i < 5; i++) {
+    		member.productionPipeline[i] = 0;
+		}
+    } 
+
+
+function body for initializeCustomerDemand():
+
+    customerDemand.clear();
+
+    // Add initial customer demand based on selected pattern
+    if (demandPatternRadio.getValue() == 0) { // Constant
+        // Constant demand of 4 units per week
+        for (int i = 0; i < gameLength; i++) {
+            customerDemand.add(4);
+        }
+    } else if (demandPatternRadio.getValue() == 1) { // Step Increase
+        // Initial demand of 4 units, then step increase to 8 units at week 5
+        for (int i = 0; i < gameLength; i++) {
+            if (i < 4) {
+                customerDemand.add(4);
+            } else {
+                customerDemand.add(8);
+            }
+        }
+    } else if (demandPatternRadio.getValue() == 2) { // Random
+        // Random demand between 2 and 6 units
+        Random random = new Random();
+        for (int i = 0; i < gameLength; i++) {
+            customerDemand.add(random.nextInt(5) + 2); // Random value between 2 and 6
+        }
+    } else {
+        // Default to constant demand if no option selected
+        for (int i = 0; i < gameLength; i++) {
+            customerDemand.add(4);
+        }
+    }
+
+    // Make sure customerDemand is not empty to avoid IndexOutOfBoundsException
+    if (customerDemand.isEmpty()) {
+        for (int i = 0; i < gameLength; i++) {
+            customerDemand.add(4); // Default value
+        }
+    }
+
+Function body for findMemberByType(memberType String):
+
+for (SupplyChainMember member : supplyChain) {
+        if (member.memberType.equals(memberType)) {
+            return member;
+        }
+    }
+    return null;
+
+Function Body for getCurrentMember():
+
+String role = roleSelector.getValue();
+for (SupplyChainMember member : supplyChain) {
+    if (member.memberType.equals(role)) {
+        return member;
+    }
+}
+return null; // Should never happen if roles are set up correctly
+
+Function body for getShipmentQueueString():
+
+SupplyChainMember currentMember = getCurrentMember();
+    if (currentMember == null) return "";
+    
+    StringBuilder sb = new StringBuilder("Incoming Shipments: ");
+    for (int i = 0; i < currentMember.shipmentPipeline.length; i++) {
+        if (currentMember.shipmentPipeline[i] > 0) {
+            sb.append(currentMember.shipmentPipeline[i])
+              .append(" (in ")
+              .append(i)
+              .append(" weeks), ");
+        }
+    }
+    return sb.length() > 20 ? sb.substring(0, sb.length() - 2) : "None";
+
+Function body for isComputerControlled(SupplyChainMember member):
+
+// During autoplay, all members are computer-controlled
+if (autoplayActive) {
+	return true;
+}
+    
+// Otherwise, the member is computer controlled if it's not the selected role
+String selectedRole = roleSelector.getValue();
+return !member.memberType.equals(selectedRole);
+
+Function body for computerOrder(SupplyChainMember member):
+
+// Base order on current demand
+    int orderAmount = member.incomingOrder;
+    
+    // Consider backorders
+    if (member.backorderedAmount > 0) {
+        orderAmount += member.backorderedAmount;
+    }
+    
+    // Consider inventory level
+    if (member.currentInventory < 12) { // Desired inventory level
+        orderAmount += (12 - member.currentInventory);
+    } else if (member.currentInventory > 20) { // Too much inventory
+        orderAmount = Math.max(0, orderAmount - (member.currentInventory - 20));
+    }
+    
+    // Place the order to the appropriate supplier
+    if (orderAmount > 0) {
+        member.outgoingOrder = orderAmount;
+        
+        // Find the supplier and place the order directly to their pipeline
+        SupplyChainMember supplier = null;
+        if (member.memberType.equals("Retailer")) {
+            for (SupplyChainMember m : supplyChain) {
+                if (m.memberType.equals("Wholesaler")) {
+                    supplier = m;
+                    break;
+                }
+            }
+        } else if (member.memberType.equals("Wholesaler")) {
+            for (SupplyChainMember m : supplyChain) {
+                if (m.memberType.equals("Distributor")) {
+                    supplier = m;
+                    break;
+                }
+            }
+        } else if (member.memberType.equals("Distributor")) {
+            for (SupplyChainMember m : supplyChain) {
+                if (m.memberType.equals("Factory")) {
+                    supplier = m;
+                    break;
+                }
+            }
+        }
+        
+        if (supplier != null) {
+            supplier.orderPipeline[orderDelayPeriod] += orderAmount;
+            trace("Computer " + member.memberType + " placed order of " + 
+                  orderAmount + " to " + supplier.memberType);
+        }
+    }
+
+    Function body for processWeeklyCycle():
+
+    // Step 1: Process incoming shipments for all members FIRST
+    for (SupplyChainMember member : supplyChain) {
+        member.processIncomingShipments(this);
+    }
+    
+    // Step 2: Process completed Production
+    for (SupplyChainMember member : supplyChain) {
+        if (member.memberType.equals("Factory")) {
+            member.processCompletedProduction(this);
+        }
+    }
+    
+    // Step 3: Process incoming orders from previous cycle
+    for (SupplyChainMember member : supplyChain) {
+        member.processIncomingOrders(this);
+    }
+    
+    // Step 4: Get customer demand for the week
+    int customerDemandForWeek = customerDemand.get(
+        currentWeek < customerDemand.size() ? currentWeek : customerDemand.size() - 1);
+
+    // Step 5: Find the retailer and place customer order
+    SupplyChainMember retailer = null;
+    for (SupplyChainMember member : supplyChain) {
+        if (member.memberType.equals("Retailer")) {
+            retailer = member;
+            break;
+        }
+    }
+    
+    if (retailer != null) {
+        retailer.placeOrder(customerDemandForWeek, orderDelayPeriod, this);
+        
+        // Special handling for zero delay orders - process immediately
+        if (orderDelayPeriod == 0) {
+            retailer.processIncomingOrders(this);
+        }
+    }
+    
+    // Step 6: Let computer-controlled members place orders
+    for (SupplyChainMember member : supplyChain) {
+        if (isComputerControlled(member)) {
+            computerOrder(member);
+            
+            // Special handling for zero delay orders - process immediately
+            if (orderDelayPeriod == 0) {
+                member.processIncomingOrders(this);
+            }
+        }
+    }
+    
+    // Step 7: Factory production (special handling for the Factory)
+    for (SupplyChainMember member : supplyChain) {
+        if (member.memberType.equals("Factory") && member.outgoingOrder > 0) {
+            member.produceUnits(member.outgoingOrder);
+        }
+    }
+    
+    // Step 8: Advance all members' pipelines
+    for (SupplyChainMember member : supplyChain) {
+        member.advancePipelines();
+    }
+    
+    // Steps 9-11
+    // Update costs, collect data, and update UI
+    for (SupplyChainMember member : supplyChain) {
+        member.updateCosts();
+    }
+    
+    // Collect data for visualization
+    for (SupplyChainMember member : supplyChain) {
+        if (member.memberType.equals("Retailer")) {
+            retailerInventoryData.add((double)currentWeek, member.currentInventory);
+            retailerBackorderData.add((double)currentWeek, member.backorderedAmount);
+            retailerCostData.add((double)currentWeek, member.totalCost);
+            retailerIncomingShipmentsData.add((double)currentWeek, member.incomingShipment);
+        } else if (member.memberType.equals("Wholesaler")) {
+            wholesalerInventoryData.add((double)currentWeek, member.currentInventory);
+            wholesalerBackorderData.add((double)currentWeek, member.backorderedAmount);
+            wholesalerCostData.add((double)currentWeek, member.totalCost);
+			wholesalerIncomingShipmentsData.add((double)currentWeek, member.incomingShipment);
+        } else if (member.memberType.equals("Distributor")) {
+            distributorInventoryData.add((double)currentWeek, member.currentInventory);
+            distributorBackorderData.add((double)currentWeek, member.backorderedAmount);
+            distributorCostData.add((double)currentWeek, member.totalCost);
+            distributorIncomingShipmentsData.add((double)currentWeek, member.incomingShipment);
+        } else if (member.memberType.equals("Factory")) {
+            factoryInventoryData.add((double)currentWeek, member.currentInventory);
+            factoryBackorderData.add((double)currentWeek, member.backorderedAmount);
+            factoryCostData.add((double)currentWeek, member.totalCost);
+            factoryIncomingShipmentsData.add((double)currentWeek, member.incomingShipment);
+        }
+    }
+    
+    // Calculate and record the total supply chain cost
+    double totalCost = 0;
+    for (SupplyChainMember member : supplyChain) {
+        totalCost += member.totalCost;
+    }
+    totalCostData.add((double)currentWeek, totalCost);
+    
+    // Finally, update the player interface
+    updatePlayerInterface();
+
+    Function body for updatePlayerInterface():
+
+    SupplyChainMember currentMember = getCurrentMember();
+if (currentMember != null) {
+        // Update role name
+        roleTitle.setText(currentMember.memberType);
+        
+        // Update order display
+        orderDisplay.setText("" + currentMember.incomingOrder);
+        
+        // Update inventory display
+        stockDisplay.setText("" + currentMember.currentInventory);
+        
+        // Update backorder display
+        backorderDisplay.setText("" + currentMember.backorderedAmount);
+        
+        // Update outgoing shipment display
+        outgoingDisplay.setText("" + currentMember.outgoingShipment);
+        
+        // Update incoming shipment display
+        incomingDisplay.setText("This Week: " + 
+			(getCurrentMember().memberType.equals("Factory") ? 
+    		"Production: " + getCurrentMember().incomingShipment :
+    		"Incoming: " + getCurrentMember().incomingShipment));
+        
+        // Update cost display
+        costDisplay.setText("$" + (int)currentMember.totalCost);
+        
+        // Update shipment Queue
+		shipmentQueue.setText("Next Week: " + 
+			(getCurrentMember().memberType.equals("Factory") ? 
+    		(getCurrentMember().productionPipeline.length > 0 ? getCurrentMember().productionPipeline[0] : 0) :
+    		(getCurrentMember().shipmentPipeline.length > 0 ? getCurrentMember().shipmentPipeline[0] : 0)));
+        
+        // You could also add displays for orders and shipments in queue
+        // For example: ordersInQueueDisplay.setText("" + currentMember.orderQueue.size());
+}
+
+// In the SupplyChainMember class
+
+Function body for processIncomingShipments(MainAgent mainAgent):
+
+int incomingShipmentAmount = shipmentPipeline[0];
+    if (incomingShipmentAmount > 0) {
+        // Update for display
+        this.incomingShipment = incomingShipmentAmount;
+        
+        // Add to inventory
+        currentInventory += incomingShipmentAmount;
+        
+        trace(memberType + " RECEIVED SHIPMENT of " + incomingShipmentAmount + 
+              ", new inventory: " + currentInventory);
+              
+        // Try to fulfill backorders with new inventory
+        if (backorderedAmount > 0) {
+            int toFulfill = Math.min(backorderedAmount, currentInventory);
+            if (toFulfill > 0) {
+                currentInventory -= toFulfill;
+                backorderedAmount -= toFulfill;
+                
+                // Ship fulfilled backorders
+                shipProduct(toFulfill, shippingDelayPeriod, main);
+                
+                trace(memberType + " fulfilled " + toFulfill + " backorders, remaining: " + 
+                      backorderedAmount);
+            }
+        }
+    }
+
+Function body for processIncomingOrders(MainAgent mainAgent):
+
+int incomingOrder = orderPipeline[0]; // Only use orders from the pipeline
+trace(memberType + " is about to process incoming orders; orderPipeline[0] = " + incomingOrder + ", currentInventory = " + currentInventory);
+    if (incomingOrder > 0) {
+        // Update for display
+        this.incomingOrder = incomingOrder;
+        
+        // Fulfill what we can
+        int toShip = Math.min(currentInventory, incomingOrder);
+        currentInventory -= toShip;
+        backorderedAmount += (incomingOrder - toShip);
+        
+        // Ship what we could fulfill
+        shipProduct(toShip, shippingDelayPeriod, main);
+        outgoingShipment = toShip; // For display purposes
+        
+        trace(memberType + " processed order: shipped " + toShip + 
+              ", remaining inventory " + currentInventory + 
+              ", remaining backorders " + backorderedAmount);
+        trace("DEBUG: " + memberType + " processing order of " + incomingOrder + 
+      ", current inventory: " + currentInventory + 
+      ", will ship: " + toShip);
+    }
+
+Function body for processCompletedProduction(MainAgent mainAgent):
+
+if (memberType.equals("Factory")) {
+    int completedProduction = productionPipeline[0];
+    if (completedProduction > 0) {
+        // Add completed production to inventory
+        currentInventory += completedProduction;
+        trace("Factory completed production of " + completedProduction + 
+              " units, new inventory: " + currentInventory);
+        
+        // Immediately try to fulfill backorders with new inventory
+        if (backorderedAmount > 0 && currentInventory > 0) {
+            int toFill = Math.min(backorderedAmount, currentInventory);
+            currentInventory -= toFill;
+            backorderedAmount -= toFill;
+            
+            // Ship the fulfilled backorders
+            shipProduct(toFill, shippingDelayPeriod, main);
+            
+            trace("Factory fulfilled " + toFill + " backorders, remaining backorders: " + 
+                  backorderedAmount + ", remaining inventory: " + currentInventory);
+        }
+    }
+}
+
+Function body for shipProduct(int amount, int delay, MainAgent mainAgent):
+
+// Ship the product to the next member in the supply chain
+
+if (amount <= 0) return;
+    
+    // Find the downstream member who should receive this shipment
+    SupplyChainMember recipient = null;
+    if (memberType.equals("Factory")) {
+        recipient = main.findMemberByType("Distributor");
+    } else if (memberType.equals("Distributor")) {
+        recipient = main.findMemberByType("Wholesaler");
+    } else if (memberType.equals("Wholesaler")) {
+        recipient = main.findMemberByType("Retailer");
+    }
+    
+    // Add the shipment to the recipient's incoming shipment pipeline
+    if (recipient != null) {
+        recipient.shipmentPipeline[delayPeriod] += amount;
+        trace(memberType + " scheduled shipment of " + amount + 
+              " to " + recipient.memberType + " with delay " + delayPeriod);
+    }
+
+Function body for updateCosts():
+
+// Update the total cost for the current member
+// Calculate costs for this period
+double periodCost = 0;
+    
+// Holding cost for positive inventory
+if (currentInventory > 0) {
+    periodCost += currentInventory * holdingCost;
+}
+
+// Backorder cost
+if (backorderedAmount > 0) {
+    periodCost += backorderedAmount * backorderCost;
+}
+
+// Add this period's cost to the total
+totalCost += periodCost;
+
+// Log for debugging
+trace("Member " + memberType + " has holdingCost=" + holdingCost + ", backorderCost=" + backorderCost);
+
+trace("Member " + memberType + " costs: period cost $" + periodCost + 
+      ", total cost $" + totalCost); 
+
+Function body for advancePipelines():
+
+// Advance the pipelines for the current member
+// For orders: if order delay is greater than 0, do the normal shifting;
+    // otherwise, simply clear the order bucket at index 0.
+    if (orderDelayPeriod > 0) {
+        for (int i = 0; i < orderPipeline.length - 1; i++) {
+            orderPipeline[i] = orderPipeline[i + 1];
+        }
+        orderPipeline[orderPipeline.length - 1] = 0;
+    } else {
+    	trace(memberType + " orderPipeline before clearing: " + Arrays.toString(orderPipeline));
+        orderPipeline[0] = 0;
+        trace(memberType + " orderPipeline after clearing: " + Arrays.toString(orderPipeline));
+    }
+    
+    // Advance shipments (shipping delay remains at 1 or more)
+    for (int i = 0; i < shipmentPipeline.length - 1; i++) {
+        shipmentPipeline[i] = shipmentPipeline[i + 1];
+    }
+    shipmentPipeline[shipmentPipeline.length - 1] = 0;
+    
+    // Advance production pipelines
+    for (int i = 0; i < productionPipeline.length - 1; i++) {
+        productionPipeline[i] = productionPipeline[i + 1];
+    }
+    productionPipeline[productionPipeline.length - 1] = 0;
+    
+    trace(memberType + " advancing pipelines. Production[0]=" + productionPipeline[0]);
+
+Function body for produceUnits(int amount):
+
+if (memberType.equals("Factory")) {
+    // Start with zero production by default
+    int productionAmount = 0;
+    
+    // Only consider production if inventory isn't too high
+    if (currentInventory <= 30) {
+        // Base production on incoming order, but cap it
+        productionAmount = Math.min(amount, 8); // Limit single production run
+        
+        // Add backorders if we have any, but still maintain a reasonable cap
+        if (backorderedAmount > 0) {
+            productionAmount += Math.min(backorderedAmount, 10);
+        }
+        
+        // Adjust based on inventory level
+        if (currentInventory < 12) {
+            // Add enough to reach target inventory of 12, but cap the addition
+            productionAmount += Math.min(12 - currentInventory, 10);
+        } else if (currentInventory > 20) {
+            // Reduce production as inventory increases
+            productionAmount = Math.max(0, productionAmount - (currentInventory - 20));
+        }
+        
+        // Final cap to prevent excessive production
+        productionAmount = Math.min(productionAmount, 25);
+    }
+    
+    // Add to production pipeline with 1-week delay
+    productionPipeline[1] += productionAmount;
+    
+    trace("Factory queued " + productionAmount + " units for production with 1-week delay");
+}
+
+Function body for placeOrder(int demand, int delay, MainAgent mainAgent):
+if (amount <= 0) return;
+    
+    // For all orders, including delay 0, place in the pipeline
+    if (delayPeriod < orderPipeline.length) {
+        orderPipeline[delayPeriod] += amount;
+        trace(memberType + " placed order of " + amount + " with delay " + delayPeriod);
+    }
