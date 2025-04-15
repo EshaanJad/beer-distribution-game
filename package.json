@@ -1,0 +1,22 @@
+{
+  "name": "beer-distribution-game",
+  "version": "1.0.0",
+  "description": "Beer Distribution Game - Supply Chain Simulation",
+  "main": "integration_test.js",
+  "scripts": {
+    "start": "./start.sh",
+    "test": "node integration_test.js",
+    "test:interactive": "node integration_test.js --interactive",
+    "backend": "cd backend && node server.js",
+    "frontend": "cd beer-distribution-game-UI && npm run dev",
+    "check-db": "node backend/utils/db-checker.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "ws": "^8.13.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "private": true
+}

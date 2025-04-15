@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Linting
+.eslintcache
+
+# Testing
+/coverage
+
+# Misc
+.DS_Store
+*.pem
+.idea/
+.vscode/
+
+# Temporary files
+*.swp
+*.swo
+.temp
+.tmp
+
+# MongoDB data
+backend/data/
+/data/db/
+*.log
+
+# Blockchain related
+.secret
+
+# Cache
+.cache/
+.vercel/
+.turbo
+
+# Mobile
+.gradle
+local.properties
+.settings
+
+# System Files
+.project
+.classpath
+*.sublime-workspace
+*.sublime-project 
