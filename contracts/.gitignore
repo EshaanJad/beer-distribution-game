@@ -1,0 +1,21 @@
+# Hardhat
+cache/
+artifacts/
+
+# Environment variables
+.env
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Local development files
+.DS_Store
+.idea/
+.vscode/
+
+# Build output
+dist/
+build/ 

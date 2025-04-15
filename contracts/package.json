@@ -1,0 +1,27 @@
+{
+  "name": "beer-distribution-game-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for the Beer Distribution Game",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js",
+    "deploy:testnet": "npx hardhat run scripts/deploy-testnet.js --network sepolia",
+    "node": "npx hardhat node"
+  },
+  "keywords": [
+    "ethereum",
+    "smart-contracts",
+    "beer-distribution-game",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@openzeppelin/contracts": "^4.8.0",
+    "dotenv": "^16.0.3",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.9.0"
+  }
+}
